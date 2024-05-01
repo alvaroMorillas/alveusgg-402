@@ -37,6 +37,7 @@ import {
   VideoLinksField,
 } from "../shared/form/VideoLinksField";
 import Link from "../content/Link";
+import { LocationPickerField } from "../shared/form/LocationPickerField";
 
 export const allowedFileTypes = [
   "image/png",
@@ -276,6 +277,7 @@ export function ShowAndTellEntryForm({
               defaultValue={entry?.displayName || undefined}
               placeholder="What should we call you?"
             />
+            <LocationPickerField />
           </Fieldset>
           <Fieldset legend="Post">
             <TextField
