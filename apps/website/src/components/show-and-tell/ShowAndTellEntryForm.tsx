@@ -32,12 +32,12 @@ import { ImageUploadAttachment } from "../shared/form/ImageUploadAttachment";
 import { MessageBox } from "../shared/MessageBox";
 import { TextAreaField } from "../shared/form/TextAreaField";
 import { NumberField } from "../shared/form/NumberField";
+import { LocationPickerField } from "../shared/form/LocationPickerField";
 import {
   useVideoLinksData,
   VideoLinksField,
 } from "../shared/form/VideoLinksField";
 import Link from "../content/Link";
-import { LocationPickerField } from "../shared/form/LocationPickerField";
 
 export const allowedFileTypes = [
   "image/png",
@@ -277,7 +277,15 @@ export function ShowAndTellEntryForm({
               defaultValue={entry?.displayName || undefined}
               placeholder="What should we call you?"
             />
-            <LocationPickerField />
+            {!isAnonymous && (
+              <LocationPickerField
+                label="Location"
+                placeholder="Where are you from?"
+                maxLength={40}
+                queryType="name_startsWith"
+                featureClasses={["p"]}
+              />
+            )}
           </Fieldset>
           <Fieldset legend="Post">
             <TextField
@@ -288,6 +296,13 @@ export function ShowAndTellEntryForm({
               name="title"
               defaultValue={entry?.title}
               placeholder="What's your post about?"
+            />
+            <LocationPickerField
+              label="Location"
+              placeholder="Where did this post take place?"
+              maxLength={40}
+              queryType="name_startsWith"
+              featureClasses={["p"]}
             />
             <RichTextField
               label="Content"
