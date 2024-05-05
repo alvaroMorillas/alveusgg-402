@@ -3,9 +3,13 @@ import { useDebouncedCallback } from "use-debounce";
 import Select from "react-select";
 
 // TO-DO:
-// 1) Crear mapa que represente las localizaciones. Puedo crear varios mapas, uno por país más general y otro más específico
-// que represente cada usuario en su ciudad, y cuantos más usuarios más grande el círculo.
-// 2) Tener en cuenta que un usuario puede crear varios posts en la misma localización, no contar a ese usuario varias veces.
+// 1) Investigar tipo de columna JSON en Prisma para type ShowAndTellLocation. Preguntar a pje si lo puedo usar o mejor meto el json en una columna de tipo string.
+// 2) Probar con localizaciones extra largas, llevar la columna de 100 caracteres al límite.
+// 3) Probar con distintos featureCodes y featureClasses. Probar también sin pasar ninguno de los parámetros.
+// 4) El desplegable es azul por algún motivo, igualar al estilo de Alveus.
+// 5) Sanear mejor el string que llega a handleSearch.
+// 6) Crear mapas.
+// 7) Tener en cuenta que un usuario puede crear varios posts en la misma localización, no contar a ese usuario varias veces en los mapas de tipo "usuarios únicos".
 
 /**
  * Data persisted to the database consisting on a recognizable name to display wherever and coordinates to draw on a map.
@@ -17,7 +21,7 @@ type ShowAndTellLocation = {
 };
 
 /**
- * Used to show the location on this Component. It shows the label to the user but has the rest of the info underlying.
+ * Used to show the location on this Component. It shows the label to the user but has the rest of the info (value) underlying.
  */
 type FilteredLocation = {
   value: string;
@@ -47,8 +51,8 @@ export type LocationPickerFieldProps = {
 const MINIMUM_SEARCH_LENGTH = 3;
 const DEBOUNCE_DELAY_MS = 300;
 
-const API_URL = "http://api.geonames.org/search?";
-const API_USER = "xilipa3578"; // FIXME: idk where to put this, but surely not here.
+const API_URL = "http://api.geonames.org/search?"; // FIXME: idk where to put this, but surely not here?
+const API_USER = "xilipa3578"; // FIXME: idk where to put this, but surely not here?
 
 export function LocationPickerField(props: LocationPickerFieldProps) {
   const [filteredLocations, setFilteredLocations] = useState(
@@ -161,7 +165,8 @@ export function LocationPickerField(props: LocationPickerFieldProps) {
         options={filteredLocations}
         defaultInputValue={
           props.defaultValue
-            ? JSON.parse(props.defaultValue).displayName
+            ? (JSON.parse(props.defaultValue) as ShowAndTellLocation)
+                .displayName
             : undefined
         }
       />
