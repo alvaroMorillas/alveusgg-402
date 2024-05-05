@@ -153,6 +153,7 @@ export function ShowAndTellEntryForm({
       imageAttachments: { create: [], update: {} },
       videoLinks: videoLinksData.videoUrls,
       volunteeringMinutes: hours ? hours * 60 : null,
+      location: formData.get("location") as string,
     };
 
     for (const fileReference of imageAttachmentsData.files) {
@@ -277,15 +278,16 @@ export function ShowAndTellEntryForm({
               defaultValue={entry?.displayName || undefined}
               placeholder="What should we call you?"
             />
-            {!isAnonymous && (
+            {/*!isAnonymous && (
               <LocationPickerField
+                name="userLocation"
                 label="Location"
                 placeholder="Where are you from?"
                 maxLength={40}
                 queryType="name_startsWith"
                 featureClasses={["p"]}
               />
-            )}
+            )*/}
           </Fieldset>
           <Fieldset legend="Post">
             <TextField
@@ -298,11 +300,13 @@ export function ShowAndTellEntryForm({
               placeholder="What's your post about?"
             />
             <LocationPickerField
+              name="location"
               label="Location"
               placeholder="Where did this post take place?"
-              maxLength={40}
+              maxLength={100}
               queryType="name_startsWith"
               featureClasses={["p"]}
+              defaultValue={entry?.location || undefined}
             />
             <RichTextField
               label="Content"

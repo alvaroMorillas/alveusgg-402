@@ -1,39 +1,41 @@
 import { useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
+import Select from "react-select";
 
 // TO-DO:
-// 1) Guardar localización en el post. Estaría guay mostrar un globo del mundo con la localización de la persona, pero
-// si no es posible con guardar la cadena de texto de la localización creo que es suficiente. Igual se puede añadir
-// la banderita al lado de la localización con <img src="https://flagsapi.com/:country_code/flat/64.png">
-// La api superior tiene licencia MIT, tener en cuenta antes de subir nada.
-// 2) Guardar coordenadas en lugar del geonameId por si cambiamos de API poder representarlo igualmente.
-// 3) Crear mapa que represente las localizaciones. Puedo crear varios mapas, uno por país más general y otro más específico
+// 1) Crear mapa que represente las localizaciones. Puedo crear varios mapas, uno por país más general y otro más específico
 // que represente cada usuario en su ciudad, y cuantos más usuarios más grande el círculo.
-// 4) Tener en cuenta que un usuario puede crear varios posts en la misma localización, no contar a ese usuario varias veces.
-// 5) En el menu de admin dar la posibilidad de eliminar la localización, por si es una localización polémica o doxxes someone.
+// 2) Tener en cuenta que un usuario puede crear varios posts en la misma localización, no contar a ese usuario varias veces.
 
 /**
- * Location returned by the API. This is the more relevant API agnostic data.
+ * Data persisted to the database consisting on a recognizable name to display wherever and coordinates to draw on a map.
  */
-type FilteredLocation = {
-  geonameId: number;
-  name: string;
-  adminName: string; // Administrative subdivision: US State, Spanish Autonomous Community, etc.
-  countryName: string;
+type ShowAndTellLocation = {
+  displayName: string;
   lattitude: string;
   longitude: string;
+};
+
+/**
+ * Used to show the location on this Component. It shows the label to the user but has the rest of the info underlying.
+ */
+type FilteredLocation = {
+  value: string;
+  label: string;
 };
 
 /**
  * For featureClasses and featureCodes @see {@link https://www.geonames.org/export/codes.html|Feature types}
  */
 export type LocationPickerFieldProps = {
+  name: string;
   label: string;
   placeholder: string;
   maxLength: number;
   queryType: "name_startsWith"; // Implement the rest when needed.
   featureClasses?: string[];
   featureCodes?: string[];
+  defaultValue?: string;
 };
 
 /**
@@ -52,15 +54,7 @@ export function LocationPickerField(props: LocationPickerFieldProps) {
   const [filteredLocations, setFilteredLocations] = useState(
     [] as FilteredLocation[],
   );
-  const [tooltip, setTooltip] = useState("");
-  const [inputValue, setInputValue] = useState("");
-
-  /**
-   * Clears the dropwdown so it stops appearing, better than just hiding it with all the info still loaded.
-   */
-  const clearFilteredLocationDropdown = (): void => {
-    setFilteredLocations([] as FilteredLocation[]);
-  };
+  const [isLoading, setIsLoading] = useState(false);
 
   /**
    * Creates a feature parameter string ready to pass to the api url
@@ -84,11 +78,14 @@ export function LocationPickerField(props: LocationPickerFieldProps) {
 
   /**
    * Sends a request to the API with the query type, features and query term passed.
+   * Throttles calls to the API to not use all the credits, in case a user has a bad day and misses all their keystrokes.
    * @param query User input value
    * @see {@link https://www.geonames.org/export/geonames-search.html|Endpoint Documentation}
    */
-  const searchLocation = async (query: string) => {
+  const searchLocation = useDebouncedCallback(async (query: string) => {
     try {
+      setIsLoading(true);
+
       const featureClasses = processFeatures(
         props.featureClasses,
         "featureClass",
@@ -102,8 +99,7 @@ export function LocationPickerField(props: LocationPickerFieldProps) {
       const tempLocations = [] as FilteredLocation[];
 
       data["geonames"]?.forEach(
-        (element: {
-          geonameId: number;
+        (item: {
           name: string;
           adminName1: string;
           countryName: string;
@@ -114,97 +110,61 @@ export function LocationPickerField(props: LocationPickerFieldProps) {
           // We'll assume that two locations are equal if their city/village name, administrative name and country name are the same.
           const exists = tempLocations.find(
             (l) =>
-              l.name === element.name &&
-              l.adminName === element.adminName1 &&
-              l.countryName === element.countryName,
+              l.label ===
+              `${item.name}, ${item.adminName1} (${item.countryName})`,
           );
 
           if (!exists) {
-            const loc: FilteredLocation = {
-              geonameId: element.geonameId,
-              name: element.name,
-              adminName: element.adminName1,
-              countryName: element.countryName,
-              lattitude: element.lat,
-              longitude: element.lng,
-            };
-            tempLocations.push(loc);
+            tempLocations.push({
+              value: JSON.stringify({
+                displayName: `${item.name}, ${item.adminName1} (${item.countryName})`,
+                lattitude: item.lat,
+                longitude: item.lng,
+              }),
+              label: `${item.name}, ${item.adminName1} (${item.countryName})`,
+            });
           }
         },
       );
 
-      if (tempLocations.length > 0) {
-        setTooltip("");
-        setFilteredLocations(tempLocations);
-      } else {
-        clearFilteredLocationDropdown();
-        setTooltip("Location not found. Try with a nearby village or city.");
-      }
+      setFilteredLocations(
+        tempLocations.length > 0 ? tempLocations : ([] as FilteredLocation[]),
+      );
     } catch (error) {
       console.log(error);
-    }
-  };
-
-  /**
-   * Handles the input, search and tooltips.
-   * Throttles calls to the API to not use all the credits, in case a user has a bad day and misses all their keystrokes.
-   */
-  const handleSearch = useDebouncedCallback(({ value }) => {
-    if (value) {
-      value = value.trim().replace(/\s{2,}/g, ""); // "Sanitize" the string.
-      if (value.length >= MINIMUM_SEARCH_LENGTH) {
-        searchLocation(value);
-      } else {
-        setTooltip(
-          `Write at least ${MINIMUM_SEARCH_LENGTH} characters to start searching.`,
-        );
-        clearFilteredLocationDropdown();
-      }
-    } else {
-      setTooltip("");
-      clearFilteredLocationDropdown();
+    } finally {
+      setIsLoading(false);
     }
   }, DEBOUNCE_DELAY_MS);
 
-  // TODO: handle loss of focus
-  const handleFocusLoss = () => {
-    console.log(`LOST FOCUS WITH INPUT VALUE ${inputValue}`);
+  /**
+   * Basic input control
+   */
+  const handleSearch = (value: string) => {
+    value = value.trim().replace(/\s{2,}/g, ""); // "Sanitize" the string in case the user slept on the spacebar.
+    if (value) {
+      if (value.length >= MINIMUM_SEARCH_LENGTH) {
+        searchLocation(value);
+      }
+    }
   };
 
   return (
     <div>
       <label>{props.label}</label>
-      <input
-        type="text"
-        value={inputValue}
+      <Select
+        name={props.name}
         className="w-full rounded-sm border border-gray-700 bg-white p-1 text-black"
-        onChange={(e) => setInputValue(e.target.value)}
-        onInput={(e) => handleSearch(e.target)}
+        onInputChange={handleSearch}
+        isLoading={isLoading}
         placeholder={props.placeholder}
-        maxLength={props.maxLength}
-      ></input>
-      {filteredLocations.length > 0 && (
-        <div className="max-h-40 w-full overflow-y-auto rounded-sm border border-gray-700 bg-white p-1 text-black">
-          {filteredLocations.map((location) => (
-            <div
-              key={location.geonameId}
-              onClick={() => {
-                setInputValue(
-                  `${location.name}, ${location.adminName} (${location.countryName})`,
-                );
-                clearFilteredLocationDropdown();
-              }}
-            >
-              {`${location.name}, ${location.adminName} (${location.countryName})`}
-            </div>
-          ))}
-        </div>
-      )}
-      {tooltip && (
-        <div className="max-h-40 w-full overflow-y-auto rounded-sm border border-gray-700 bg-white p-1 text-gray-500">
-          {tooltip}
-        </div>
-      )}
+        options={filteredLocations}
+        defaultInputValue={
+          props.defaultValue
+            ? JSON.parse(props.defaultValue).displayName
+            : undefined
+        }
+      />
     </div>
   );
 }
